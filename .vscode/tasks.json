@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "go: run current file",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "run",
+        "main.go",
+        "--dry-run",
+        "--projects-dir",
+        "~/Projects",
+        "--backup-dir",
+        "~/OneDrive/Backup/Projects",
+        "--force-include",
+        ".env"
+      ],
+      "group": "build",
+      "presentation": {
+        "focus": true
+      }
+    },
+    {
+      "label": "go: build executable",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "build",
+        "-o",
+        "build/git-local-backup.exe",
+        "-ldflags",
+        "\"-w -s\"",
+        "--trimpath",
+        "main.go",
+      ],
+      "group": "build",
+      "presentation": {
+        "focus": true
+      }
+    },
+  ]
+}
