@@ -29,9 +29,7 @@ such as `.env` containing private keys that should be backed up locally with a t
 ## Usage
 
 Download the [latest release](https://github.com/ni554n/git-local-backup/releases/latest) and
-extract the binary to a suitable path.
-
-> On Linux and MacOS, provide the execute permission with `chmod +x /path/to/git-local-backup`
+extract (`tar -xvzf`) the binary to a suitable path.
 
 Here's all the options you can configure:
 
