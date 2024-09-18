@@ -1,6 +1,23 @@
 # Git Local Backup
 
 A CLI tool for copying local files from Git projects to a cloud drive or a backup disk for safekeeping.
+
+```
+- Projects                           - Backup
+  - project-1                -->       - project-1
+    - .git                               - main.go
+    - main.go [modified]
+    - utils.go [deleted]
+    - README.md [origin]
+  - project-2                -->       - project-2
+    - .git                               - .env
+    - .gitignore                         - index.js
+    - .env [forced]                      - README.md
+    - index.js [untracked]
+    - package.json [origin]
+    - README.md [added]
+```
+
 It copies only the files that have been modified since the last backup, including:
 
 - Committed files that are not yet pushed to the remote repository
