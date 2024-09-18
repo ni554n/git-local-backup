@@ -20,5 +20,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
+        build_command: go build main.go
         build_flags: -trimpath
         ldflags: -s -w
