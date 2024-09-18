@@ -4,6 +4,7 @@
         "goarch",
         "ldflags",
         "trimpath",
+        "unpushed",
         "wangyoucao"
     ]
 }
