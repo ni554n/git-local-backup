@@ -26,3 +26,4 @@ jobs:
         goarch: ${{ matrix.goarch }}
         build_flags: -trimpath
         ldflags: -s -w
+        md5sum: false
