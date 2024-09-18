@@ -1,0 +1,24 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  releases-matrix:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
+        build_flags: -trimpath
+        ldflags: -s -w
