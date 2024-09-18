@@ -32,7 +32,6 @@
         "-ldflags",
         "\"-w -s\"",
         "--trimpath",
-        "main.go",
       ],
       "group": "build",
       "presentation": {
