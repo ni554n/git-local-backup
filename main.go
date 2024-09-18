@@ -58,7 +58,7 @@ Flags:
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, message, filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
-		fmt.Fprintf(w, "\nVisit https://github.com/ni554n/git-local-backup for scheduling instructions.")
+		fmt.Fprintf(w, "\nVisit https://github.com/ni554n/git-local-backup for scheduling instructions.\n")
 	}
 }
 
