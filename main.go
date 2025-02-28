@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 //#region Define CLI flags
@@ -262,18 +264,44 @@ func main() {
 		}
 	}
 
-	// Removing empty dirs recursively. Skipping 0th item as it's the backup dir path itself.
+	//#region Cleanup empty dirs
 	if !*dryRun {
+		// Skipping the 0th item because it's the root path of the backup dir itself.
 		for i := len(backedUpDirRelPaths) - 1; i > 0; i-- {
-			// Attempting to remove every backup dir. If it's not empty then it will fail expectedly.
-			err := os.Remove(filepath.Join(*backupPath, backedUpDirRelPaths[i]))
+			dirFullPath := filepath.Join(*backupPath, backedUpDirRelPaths[i])
 
-			// If the error wasn't due to the dir not being empty then it's a real error.
-			if err != nil && !os.IsNotExist(err) {
-				fmt.Println(err)
+			err := os.Remove(dirFullPath)
+			if err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
+					// The dir path doesn't exist; it may have been deleted during other steps.
+					continue
+				}
+
+				var pathErr *os.PathError
+				if errors.As(err, &pathErr) {
+					if sysErr, ok := pathErr.Err.(syscall.Errno); ok {
+						switch sysErr {
+						case syscall.EACCES, syscall.ERROR_ACCESS_DENIED:
+							err := os.Chmod(dirFullPath, 0700)
+							if err == nil {
+								err := os.Remove(dirFullPath)
+								if err != nil {
+									fmt.Println(err)
+								}
+							}
+						case syscall.ENOTEMPTY, syscall.ERROR_DIR_NOT_EMPTY:
+							continue
+						default:
+							fmt.Println(err)
+						}
+					}
+				} else {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
+	//#endregion Cleanup empty dirs
 
 	//#endregion Make the necessary changes to the backup directory
 }
