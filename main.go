@@ -107,6 +107,9 @@ func main() {
 		}
 
 		entryRelPath, err := filepath.Rel(*backupPath, path)
+		if err != nil {
+			return err
+		}
 
 		if entry.IsDir() {
 			backedUpDirRelPaths = append(backedUpDirRelPaths, entryRelPath)
@@ -180,7 +183,7 @@ func main() {
 			panicIf(err)
 
 			if info.IsDir() {
-				err = filepath.WalkDir(forceIncludedPath, func(path string, entry fs.DirEntry, err error) error {
+				err := filepath.WalkDir(forceIncludedPath, func(path string, entry fs.DirEntry, err error) error {
 					if err != nil {
 						return err
 					}
