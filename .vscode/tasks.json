@@ -2,12 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "go: run current file",
+      "label": "go: run project",
       "type": "shell",
       "command": "go",
       "args": [
         "run",
-        "main.go",
+        ".",
         "--dry-run",
         "--projects-dir",
         "~/Projects",
@@ -25,7 +25,7 @@
       }
     },
     {
-      "label": "go: build executable",
+      "label": "go: build windows executable",
       "type": "shell",
       "command": "go",
       "args": [
@@ -36,10 +36,39 @@
         "\"-w -s\"",
         "--trimpath",
       ],
+      "options": {
+        "env": {
+          "GOOS": "windows",
+          "GOARCH": "amd64"
+        }
+      },
       "group": "build",
       "presentation": {
         "focus": true
       }
     },
+    {
+      "label": "go: build linux executable",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "build",
+        "-o",
+        "build/git-local-backup",
+        "-ldflags",
+        "\"-w -s\"",
+        "--trimpath",
+      ],
+      "options": {
+        "env": {
+          "GOOS": "linux",
+          "GOARCH": "amd64"
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "focus": true
+      }
+    }
   ]
 }

@@ -284,7 +284,7 @@ func main() {
 				if errors.As(err, &pathErr) {
 					if sysErr, ok := pathErr.Err.(syscall.Errno); ok {
 						switch sysErr {
-						case syscall.EACCES, syscall.ERROR_ACCESS_DENIED:
+						case ERROR_ACCESS_DENIED:
 							err := os.Chmod(dirFullPath, 0700)
 							if err == nil {
 								err := os.Remove(dirFullPath)
@@ -292,7 +292,7 @@ func main() {
 									fmt.Println(err)
 								}
 							}
-						case syscall.ENOTEMPTY, syscall.ERROR_DIR_NOT_EMPTY:
+						case ERROR_DIR_NOT_EMPTY:
 							continue
 						default:
 							fmt.Println(err)
