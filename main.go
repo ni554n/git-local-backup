@@ -13,6 +13,8 @@ import (
 	"syscall"
 )
 
+const VERSION = "1.1"
+
 //#region Define CLI flags
 
 type forceIncludedFiles []string
@@ -39,7 +41,7 @@ func init() {
 	flag.Var(&forceIncludedRelPaths, "force-include", "Always include a git ignored `file/directory` like \".git\".\nCan be specified multiple times to include multiple items.")
 
 	flag.Usage = func() {
-		message := `Git Local Backup v1.0
+		message := `Git Local Backup v%s
 
 A tool for copying local files from Git projects to a cloud drive or a backup disk for safekeeping.
 It copies only the files that have been modified since the last backup, including:
@@ -58,7 +60,7 @@ Flags:
 
 `
 		w := flag.CommandLine.Output()
-		fmt.Fprintf(w, message, filepath.Base(os.Args[0]))
+		fmt.Fprintf(w, message, VERSION, filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 		fmt.Fprintf(w, "\nVisit https://github.com/ni554n/git-local-backup for scheduling instructions.\n")
 	}
