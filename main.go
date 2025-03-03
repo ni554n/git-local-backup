@@ -287,7 +287,7 @@ func main() {
 					if sysErr, ok := pathErr.Err.(syscall.Errno); ok {
 						switch sysErr {
 						case ERROR_ACCESS_DENIED:
-							err := os.Chmod(dirFullPath, 0700)
+							err := os.Chmod(dirFullPath, 0755)
 							if err == nil {
 								err := os.Remove(dirFullPath)
 								if err != nil {
