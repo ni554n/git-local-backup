@@ -25,7 +25,7 @@ It copies only the files that have been modified since the last backup, includin
 - Files that are not yet tracked by `git add`
 - Any .gitignored file included via `--force-include` flag
 
-> … basically every unpushed file that can be lost during an incident.
+> ... basically every unpushed file that can be lost during an incident.
 
 ## Why?
 
@@ -52,8 +52,8 @@ Here's all the options you can configure:
 
 | Flag | Description |
 | --- | --- |
-| `--projects-path` | Path to the projects directory (required) |
-| `--backup-path` | Path to an empty backup directory (required)<br>Otherwise, existing files may be removed from that directory. |
+| `--projects-dir` | Path to the projects directory (required) |
+| `--backup-dir` | Path to an empty backup directory (required)<br>Otherwise, existing files may be removed from that directory. |
 | `--remote-branch` | Remote name (default: `origin`) |
 | `--force-include` | Always include a git ignored file or directory like `.git`.<br>Specify it multiple times to include multiple items. |
 | `--dry-run` | Preview changes without modifying the backup directory |
@@ -63,13 +63,13 @@ Here's all the options you can configure:
 Assuming all your Git projects are in `~/Projects` and you want to backup to `~/OneDrive/Backup/Projects`:
 
 ```sh
-/path/to/git-local-backup --projects-path "~/Projects" --backup-path "~/OneDrive/Backup/Projects" --dry-run
+/path/to/git-local-backup --projects-dir "~/Projects" --backup-dir "~/OneDrive/Backup/Projects" --dry-run
 ```
 
 If you also want to back up Git internals like stashes, or other gitignored files such as `.env`:
 
 ```sh
-/path/to/git-local-backup --projects-path "~/Projects" --backup-path "~/OneDrive/Backup/Projects" --force-include ".git" --force-include ".env" --dry-run
+/path/to/git-local-backup --projects-dir "~/Projects" --backup-dir "~/OneDrive/Backup/Projects" --force-include ".git" --force-include ".env" --dry-run
 ```
 
 If you are satisfied with the output, remove the `--dry-run` flag, and
@@ -81,7 +81,7 @@ schedule the command to run periodically using the instructions below.
 Run `crontab -e` and add the following line:
 
 ```txt
-*/15 * * * * /path/to/git-local-backup "~/Projects" --backup-path "~/OneDrive/Backup/Projects"
+*/15 * * * * /path/to/git-local-backup --projects-dir "~/Projects" --backup-dir "~/OneDrive/Backup/Projects"
 ```
 
 </details>
@@ -102,7 +102,11 @@ Run `crontab -e` and add the following line:
   <string>Git Local Backup</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/path/to/git-local-backup --projects-path "~/Projects" --backup-path "~/OneDrive/Backup/Projects"</string>
+    <string>/path/to/git-local-backup</string>
+    <string>--projects-dir</string>
+    <string>~/Projects</string>
+    <string>--backup-dir</string>
+    <string>~/OneDrive/Backup/Projects</string>
   </array>
   <key>StartInterval</key>
   <integer>900</integer> <!-- 900 seconds = 15 minutes -->
