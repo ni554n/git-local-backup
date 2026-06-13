@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 )
@@ -24,10 +27,17 @@ func (fileNames *forceIncludedFiles) String() string {
 }
 
 func (fileNames *forceIncludedFiles) Set(value string) error {
-	*fileNames = append(*fileNames, filepath.FromSlash(value))
+	normalizedPath, err := normalizeForceInclude(value)
+	if err != nil {
+		return err
+	}
+
+	*fileNames = append(*fileNames, normalizedPath)
 
 	return nil
 }
+
+type StringSet map[string]struct{}
 
 var (
 	projectsPath          = flag.String("projects-dir", "", "Path to the projects directory (required)")
@@ -50,7 +60,7 @@ It copies only the files that have been modified since the last backup, includin
   - Working and staged files that are not yet committed
   - Files that are not yet tracked by "git add"
   - Any .gitignored file included via "--force-include" flag
-  … basically every unpushed file that can be lost during an incident.
+  ... basically every unpushed file that can be lost during an incident.
 
 Usage: %v [FLAGS] --projects-dir "<path>" --backup-dir "<path>"
 
@@ -78,29 +88,27 @@ func main() {
 		os.Exit(2)
 	}
 
-	if strings.HasPrefix(*projectsPath, "~") {
-		homeDir, err := os.UserHomeDir()
-		panicIf(err)
-		*projectsPath = filepath.Join(homeDir, (*projectsPath)[1:])
-	}
+	expandedProjectsPath, err := expandHome(*projectsPath)
+	panicIf(err)
+	*projectsPath = expandedProjectsPath
 
-	if strings.HasPrefix(*backupPath, "~") {
-		homeDir, err := os.UserHomeDir()
-		panicIf(err)
-		*backupPath = filepath.Join(homeDir, (*backupPath)[1:])
-	}
+	expandedBackupPath, err := expandHome(*backupPath)
+	panicIf(err)
+	*backupPath = expandedBackupPath
+
+	err = validateConfiguredPaths(*projectsPath, *backupPath)
+	panicIf(err)
 
 	//#endregion Parse flags
 
 	// Check if git is installed
-	_, err := exec.LookPath("git")
+	_, err = exec.LookPath("git")
 	panicIf(err)
 
 	//#region Read the full backup directory
 
 	backedUpDirRelPaths := []string{}
 
-	type StringSet map[string]struct{}
 	backedUpFileRelPaths := make(StringSet)
 
 	err = filepath.WalkDir(*backupPath, func(path string, entry fs.DirEntry, err error) error {
@@ -144,36 +152,8 @@ func main() {
 			continue
 		}
 
-		// `cd` into the project directory
-		err := os.Chdir(projectDirPath)
+		includedFiles, err := gitFilesToBackup(projectDirPath, *remoteBranch)
 		panicIf(err)
-
-		// --exclude-standard: Ignore .gitignore and other git excluded files
-		// --others: Untracked files not yet added by `git add`
-		// --full-name: Output relative paths
-		untrackedFilesStdout, err := exec.Command(
-			"git", "--no-pager", "ls-files", "--exclude-standard", "--others", "--full-name",
-		).Output()
-		panicIf(err)
-
-		includedFiles := strings.Split(filepath.FromSlash(string(untrackedFilesStdout)), "\n")
-
-		branchNameStdout, err := exec.Command(
-			"git", "--no-pager", "branch", "--show-current",
-		).Output()
-		panicIf(err)
-		branchName := strings.TrimSpace(string(branchNameStdout))
-
-		// Current branch name can be empty when a specific commit is checked out
-		if branchName != "" {
-			// Files that are in local commits but not yet pushed to the remote
-			unpushedFilesStdout, _ := exec.Command(
-				"git", "--no-pager", "diff", "--name-only", *remoteBranch+"/"+branchName,
-			).Output()
-			unpushedFiles := strings.Split(filepath.FromSlash(string(unpushedFilesStdout)), "\n")
-
-			includedFiles = append(includedFiles, unpushedFiles...)
-		}
 
 		for _, forceIncludedRelPath := range forceIncludedRelPaths {
 			forceIncludedPath := filepath.Join(projectDirPath, forceIncludedRelPath)
@@ -309,6 +289,196 @@ func main() {
 	//#endregion Cleanup empty dirs
 
 	//#endregion Make the necessary changes to the backup directory
+}
+
+func expandHome(path string) (string, error) {
+	if !strings.HasPrefix(path, "~") {
+		return path, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	if path == "~" {
+		return homeDir, nil
+	}
+
+	if strings.HasPrefix(path, "~/") || strings.HasPrefix(path, `~\`) {
+		return filepath.Join(homeDir, path[2:]), nil
+	}
+
+	return path, nil
+}
+
+func validateConfiguredPaths(projectsPath, backupPath string) error {
+	projectsAbsPath, err := filepath.Abs(projectsPath)
+	if err != nil {
+		return err
+	}
+
+	backupAbsPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		return err
+	}
+
+	if samePath(projectsAbsPath, backupAbsPath) {
+		return fmt.Errorf("backup directory must be different from projects directory")
+	}
+
+	if pathWithin(backupAbsPath, projectsAbsPath) {
+		return fmt.Errorf("backup directory must not be inside projects directory")
+	}
+
+	if pathWithin(projectsAbsPath, backupAbsPath) {
+		return fmt.Errorf("projects directory must not be inside backup directory")
+	}
+
+	return nil
+}
+
+func samePath(firstPath, secondPath string) bool {
+	firstPath = filepath.Clean(firstPath)
+	secondPath = filepath.Clean(secondPath)
+
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(firstPath, secondPath)
+	}
+
+	return firstPath == secondPath
+}
+
+func pathWithin(childPath, parentPath string) bool {
+	relPath, err := filepath.Rel(filepath.Clean(parentPath), filepath.Clean(childPath))
+	if err != nil {
+		return false
+	}
+
+	return relPath != "." &&
+		relPath != ".." &&
+		!strings.HasPrefix(relPath, ".."+string(filepath.Separator)) &&
+		!filepath.IsAbs(relPath)
+}
+
+func normalizeForceInclude(path string) (string, error) {
+	normalizedPath := filepath.Clean(filepath.FromSlash(strings.TrimSpace(path)))
+
+	if normalizedPath == "." || normalizedPath == "" {
+		return "", fmt.Errorf("force-include path cannot be empty")
+	}
+
+	if filepath.IsAbs(normalizedPath) {
+		return "", fmt.Errorf("force-include path must be relative: %s", path)
+	}
+
+	if normalizedPath == ".." || strings.HasPrefix(normalizedPath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("force-include path must stay inside each project: %s", path)
+	}
+
+	return normalizedPath, nil
+}
+
+func gitFilesToBackup(projectDirPath, remoteName string) ([]string, error) {
+	includedFiles := make(StringSet)
+
+	gitCommands := [][]string{
+		{"ls-files", "--exclude-standard", "--others", "--full-name"},
+		{"diff", "--name-only"},
+		{"diff", "--name-only", "--cached"},
+	}
+
+	for _, args := range gitCommands {
+		stdout, err := runGit(projectDirPath, args...)
+		if err != nil {
+			return nil, err
+		}
+
+		addGitOutputFiles(includedFiles, stdout)
+	}
+
+	upstreamRef, err := findUpstreamRef(projectDirPath, remoteName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", err)
+	} else if upstreamRef != "" {
+		mergeBaseStdout, err := runGit(projectDirPath, "merge-base", "HEAD", upstreamRef)
+		if err != nil {
+			return nil, err
+		}
+
+		mergeBase := strings.TrimSpace(string(mergeBaseStdout))
+		unpushedFilesStdout, err := runGit(projectDirPath, "diff", "--name-only", mergeBase, "HEAD")
+		if err != nil {
+			return nil, err
+		}
+
+		addGitOutputFiles(includedFiles, unpushedFilesStdout)
+	}
+
+	return sortedSetValues(includedFiles), nil
+}
+
+func findUpstreamRef(projectDirPath, remoteName string) (string, error) {
+	upstreamStdout, err := runGit(projectDirPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	if err == nil {
+		return strings.TrimSpace(string(upstreamStdout)), nil
+	}
+
+	branchNameStdout, err := runGit(projectDirPath, "branch", "--show-current")
+	if err != nil {
+		return "", err
+	}
+
+	branchName := strings.TrimSpace(string(branchNameStdout))
+	if branchName == "" || remoteName == "" {
+		return "", nil
+	}
+
+	remoteRef := remoteName + "/" + branchName
+	_, err = runGit(projectDirPath, "rev-parse", "--verify", "--quiet", remoteRef)
+	if err != nil {
+		return "", fmt.Errorf("no upstream configured and remote ref %q was not found", remoteRef)
+	}
+
+	return remoteRef, nil
+}
+
+func runGit(dir string, args ...string) ([]byte, error) {
+	commandArgs := append([]string{"--no-pager"}, args...)
+	cmd := exec.Command("git", commandArgs...)
+	cmd.Dir = dir
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git %s failed: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+
+	return stdout, nil
+}
+
+func addGitOutputFiles(files StringSet, stdout []byte) {
+	for _, line := range strings.Split(string(stdout), "\n") {
+		path := filepath.FromSlash(strings.TrimSpace(line))
+		if path == "" {
+			continue
+		}
+
+		files[path] = struct{}{}
+	}
+}
+
+func sortedSetValues(values StringSet) []string {
+	sortedValues := make([]string, 0, len(values))
+	for value := range values {
+		sortedValues = append(sortedValues, value)
+	}
+
+	sort.Strings(sortedValues)
+
+	return sortedValues
 }
 
 func copyFile(srcPath, dstPath string) error {
